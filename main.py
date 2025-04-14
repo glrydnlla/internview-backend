@@ -11,7 +11,7 @@ from nltk.tokenize import sent_tokenize
 
 client = OpenAI(
   base_url="https://openrouter.ai/api/v1",
-  api_key="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",
+  api_key="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",
 )
 
 app = FastAPI()
@@ -22,13 +22,16 @@ class QAPair(BaseModel):
 
 class QARequest(BaseModel):
     qa_list: List[QAPair]
+    prompt: str
     
 class TAPair(BaseModel):
     title: str
     article: str
 
-class TARequest(BaseModel):
+class SummaryRequest(BaseModel):
     article_list: List[TAPair]
+    prompt: str
+    
 
 def qa_to_text(qa_list):
     return "\n".join([f"Q: {item['question']}\nA: {item['answer']}" for item in qa_list])
@@ -39,7 +42,7 @@ def article_to_text(article_list):
 @app.post("/generate-article")
 def generate_article(data: QARequest):
     text = qa_to_text([qa.dict() for qa in data.qa_list])
-    prompt = "Buat ringkasan menggunakan bahasa indonesia dari wawancara ini dalam bentuk artikel paragraf, dengan tujuan membantu orang lain yang juga akan mengikuti wawancara yang sama. Tolong bandingkan juga jawaban peserta yang lulus dan tidak, apa yang membuat mereka lulus atau tidak lulus? sertakan jawabannya dalam artikel.  jika menemukan kalimat satir atau kata-kata tidak pantas, jangan dimasukkan ke dalam artikel, pastikan yang dimasukkan ke artikel hanya hal-hal yang berguna untuk membantu orang lain yang ingin melamar di pekerjaan yang sama. jangan sebutkan nama orang (pelamar) sama sekali, gunakan kata \"para pelamar\" untuk menggantikan nama orang (pelamar), nama perusahaan, kampus, atau institusi boleh disebutkan. \nPastikan ringkasannya dalam bentuk artikel, jangan diformat bold atau italic, tidak pakai point, tidak pakai \'*\'. Berikan Judul yang menarik dan unik yang merepresentasikan artikel tersebut.\n" + text
+    prompt = data.prompt + text
 
     completion = client.chat.completions.create(
         model="deepseek/deepseek-r1:free",
@@ -61,9 +64,9 @@ def generate_article(data: QARequest):
 
 
 @app.post("/summarize")
-def generate_article(data: TARequest):
+def generate_article(data: SummaryRequest):
     text = article_to_text([ta.dict() for ta in data.article_list])
-    prompt = "Buat rangkuman tentang artikel berikut, tidak usah diberi judul. poin pentingnya adalah apa kunci sukses dan hal yang harus dihindari supaya lulus interview yang mereka jalani secara singkat padat jelas (tidak lebih dari 1000 kata)\n\n" + text
+    prompt = data.prompt + text
     completion = client.chat.completions.create(
         model="deepseek/deepseek-r1:free",
         messages=[
