@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict
 from openai import OpenAI
@@ -11,10 +12,18 @@ from nltk.tokenize import sent_tokenize
 
 client = OpenAI(
   base_url="https://openrouter.ai/api/v1",
-  api_key="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",
+  api_key="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",
 )
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class QAPair(BaseModel):
     question: str
