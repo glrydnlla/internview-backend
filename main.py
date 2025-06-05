@@ -7,12 +7,12 @@ import sqlite3
 
 import nltk
 nltk.download('punkt')
-nltk.download('punkt_tab')
 from nltk.tokenize import sent_tokenize
+import json
 
 client = OpenAI(
   base_url="https://openrouter.ai/api/v1",
-  api_key="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",
+  api_key="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",
 )
 
 app = FastAPI()
@@ -32,6 +32,8 @@ class QA(BaseModel):
 class QARequest(BaseModel):
     qa_list: List[QA]
     prompt: str
+    keys: str
+    tags: str
     
 class TAPair(BaseModel):
     title: str
@@ -45,7 +47,7 @@ class SKPair(BaseModel):
     rank: int
     softskill: str
 
-class SummaryRequest(BaseModel):
+class SoftskillSummaryRequest(BaseModel):
     softskill_list: List[SKPair]
     prompt: str
     
@@ -72,7 +74,8 @@ def qa_list_to_text(qa_list):
 @app.post("/generate-article")
 def generate_article(data: QARequest):
     text = qa_to_text([qa.dict() for qa in data.qa_list])
-    prompt = data.prompt + text
+    prompt = data.prompt + text + f"\nRespond with a valid JSON object with keys: {data.keys}." + f"\nIf there is a key named tags or tag, choose the tags from this list: {data.tags}"
+    # print(prompt)
 
     completion = client.chat.completions.create(
         model="deepseek/deepseek-r1:free",
@@ -81,16 +84,22 @@ def generate_article(data: QARequest):
         ]
     )
 
-    article = completion.choices[0].message.content
-    article = article.replace("*", "")
+    res = completion.choices[0].message.content
+    print(res)
+    res = res.replace("*", "")
+    # print(res)
+    json_str = res[res.find('{') : res.rfind('}') + 1]
+    # print(json_str)
+    dict_result = json.loads(json_str)
+    # print(dict_result)
     
-    sentences = sent_tokenize(article)
-    title = sentences[0]
+    # sentences = sent_tokenize(article)
+    # title = sentences[0]
     
-    print(title)
-    article = article.replace(title, "").lstrip()
+    # print(title)
+    # article = article.replace(title, "").lstrip()
 
-    return {"title": title, "article": article}
+    return dict_result
 
 
 @app.post("/summarize")
@@ -108,7 +117,7 @@ def summarize(data: SummaryRequest):
     return {"summary": summary}
 
 @app.post("/find-job")
-def find_job(data: SummaryRequest):
+def find_job(data: SoftskillSummaryRequest):
     text = rank_to_text([ta.dict() for sf in data.softskill_list])
     prompt = data.prompt + text
     completion = client.chat.completions.create(
@@ -121,23 +130,23 @@ def find_job(data: SummaryRequest):
     job_summary = job_summary.replace("*", "")
     return {"job_summary": job_summary}
 
-@app.post("/process-form")
-def process_form_data(data: QARequest):
-    text = qa_list_to_text([qa.dict() for qa in data.qa_list])
-    prompt = data.prompt + text
-    completion = client.chat.completions.create(
-        model="deepseek/deepseek-r1:free",
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
-    result = completion.choices[0].message.content
-    result = result.replace("*", "")
+# @app.post("/process-form")
+# def process_form_data(data: QARequest):
+#     text = qa_list_to_text([qa.dict() for qa in data.qa_list])
+#     prompt = data.prompt + text
+#     completion = client.chat.completions.create(
+#         model="deepseek/deepseek-r1:free",
+#         messages=[
+#             {"role": "user", "content": prompt}
+#         ]
+#     )
+#     result = completion.choices[0].message.content
+#     result = result.replace("*", "")
     
-    sentences = sent_tokenize(result)
-    title = sentences[0]
+#     sentences = sent_tokenize(result)
+#     title = sentences[0]
     
-    print(title)
-    result = result.replace(title, "").lstrip()
+#     print(title)
+#     result = result.replace(title, "").lstrip()
 
-    return {"title": title, "result": result}
+#     return {"title": title, "result": result}
